@@ -1,5 +1,7 @@
 package ee.taltech.inbankbackend.service;
 
+import com.github.vladislavgoltjajev.personalcode.exception.PersonalCodeException;
+import com.github.vladislavgoltjajev.personalcode.locale.estonia.EstonianPersonalCodeParser;
 import com.github.vladislavgoltjajev.personalcode.locale.estonia.EstonianPersonalCodeValidator;
 import ee.taltech.inbankbackend.config.DecisionEngineConstants;
 import ee.taltech.inbankbackend.exceptions.InvalidLoanAmountException;
@@ -7,6 +9,8 @@ import ee.taltech.inbankbackend.exceptions.InvalidLoanPeriodException;
 import ee.taltech.inbankbackend.exceptions.InvalidPersonalCodeException;
 import ee.taltech.inbankbackend.exceptions.NoValidLoanException;
 import org.springframework.stereotype.Service;
+
+import java.time.Period;
 
 /**
  * A service class that provides a method for calculating an approved loan amount and period for a customer.
@@ -18,6 +22,7 @@ public class DecisionEngine {
 
     // Used to check for the validity of the presented ID code.
     private final EstonianPersonalCodeValidator validator = new EstonianPersonalCodeValidator();
+    private final EstonianPersonalCodeParser parser = new EstonianPersonalCodeParser();
 
     /**
      * Calculates the maximum loan amount and period for the customer based on their ID code,
@@ -36,12 +41,20 @@ public class DecisionEngine {
      */
     public Decision calculateApprovedLoan(String personalCode, Long loanAmount, int loanPeriod)
             throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException,
-            NoValidLoanException {
+            NoValidLoanException, PersonalCodeException {
         try {
             verifyInputs(personalCode, loanAmount, loanPeriod);
         } catch (Exception e) {
             return new Decision(null, null, e.getMessage());
         }
+
+        Period agePeriod = parser.getAge(personalCode);
+        int age = agePeriod.getYears();
+
+        if (age < 18 || age > 65) {
+            throw new NoValidLoanException("Loan not approved due to age constraints.");
+        }
+
 
         int creditModifier = getCreditModifier(personalCode);
 
@@ -61,7 +74,6 @@ public class DecisionEngine {
         if (!isLoanApprovable(creditModifier, loanAmount, loanPeriod)) {
             throw new NoValidLoanException("Loan cannot be approved based on the credit score.");
         }
-
 
         int outputLoanAmount = Math.min(DecisionEngineConstants.MAXIMUM_LOAN_AMOUNT, creditModifier * loanPeriod);
         return new Decision(outputLoanAmount, loanPeriod, null);
