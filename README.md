@@ -1,3 +1,7 @@
+# Conclusion
+
+The conclusion for TICKET-101 can be found in the file `conclusion.md`.
+
 # InBank Backend Service
 
 This service provides a REST API for calculating an approved loan amount and period for a customer.
